@@ -212,7 +212,7 @@ prefer LlamaIndex's API, though its docs are not as good as LangChain's.
 - initialization requires schema or data from which to infer it
 ***** Frameworks (LangChain v. LlamaIndex)
 ****** API / Design
-- LangChain's API is simpler, but more limiting thab LlamaIndex's
+- LangChain's API is simpler, but more limiting than LlamaIndex's
 ****** Libraries
 - [[https://unstructured-io.github.io/unstructured/][unstructured.io]]'s so-called [[https://github.com/Unstructured-IO/unstructured/blob/1947375b2eee8477f7ac95f55783b8262cb90ca9/unstructured/partition/org.py#L4][org-mode support]] is disappointing
   - uses [[https://github.com/JessicaTegner/pypandoc#usage][pypandoc]] under the hood
