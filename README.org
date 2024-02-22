@@ -53,7 +53,7 @@ pip3 install -r requirements.txt
 - automated *decision maker* powered by an LLM that interacts with the world using
   Tools
 
-*** Proof of Concept
+*** Proof of Concept (Python)
 The following code uses LlamaIndex to perform Retrieval Augmented Generation (RAG)
 over my org-mode documents.
 
@@ -159,7 +159,7 @@ if __name__ == "__main__":
 #+end_src
 
 The following shell script can be called easily (for example from Emacs) and
-uses the python program above to perform the RAG query.
+uses the Python program above to perform the RAG query.
 
 #+begin_src shell :tangle ~/bin/org-rag
 #!/usr/bin/env bash
