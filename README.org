@@ -84,7 +84,8 @@ class DocumentIndex:
       self.index = load_index_from_storage(context)
     else:
       log("Creating new index")
-      self.index = VectorStoreIndex.from_documents(documents, show_progress=progress)
+      self.index = VectorStoreIndex.from_documents(self.documents,
+                                                   show_progress=progress)
       self.save()
 
   def refresh(self):
