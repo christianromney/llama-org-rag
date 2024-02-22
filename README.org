@@ -59,9 +59,11 @@ over my org-mode documents.
 
 #+begin_src python :tangle rag.py
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
-from llama_index.core import StorageContext, load_index_from_storage
+from llama_index.core import Document, StorageContext, load_index_from_storage
+from llama_index.core.readers.base import BaseReader
 from llama_index.core.embeddings import resolve_embed_model
 from llama_index.llms.ollama import Ollama
+from unstructured.partition.org import partition_org
 import os, getopt, sys
 
 Settings.embed_model = resolve_embed_model("local:BAAI/bge-small-en-v1.5")
@@ -72,11 +74,18 @@ def log(message):
   if verbose:
     print(message)
 
+class OrgFileReader(BaseReader):
+  def load_data(self, file, extra_info=None):
+    with open(file, "r") as f:
+      text = f.read()
+      return [Document(text=text, extra_info=extra_info or {})]
+
 class DocumentIndex:
   def __init__(self, directory, progress=True, verbose=False):
     self.path = os.path.join(directory, ".llamaindex")
     self.documents = SimpleDirectoryReader(input_dir=directory,
                                            recursive=True,
+                                           file_extractor={".myfile": OrgFileReader()}
                                            required_exts=[".org"]).load_data()
     if os.path.exists(self.path):
       context= StorageContext.from_defaults(persist_dir=self.path)
@@ -166,6 +175,56 @@ uses the python program above to perform the RAG query.
 conda run -n llama-org-rag python3 "${HOME}/src/projects/llama-org-rag/rag.py" "$@"
 #+end_src
 
+*** Impressions
+**** Techniques
+***** RAG
+- simplistic retrieval misses lots of relevant content
+- [[https://docs.llamaindex.ai/en/stable/module_guides/observability/observability.html][observability]] is needed to understand cause
+  - is it an embedding problem?
+    - dissimilarity?
+    - cosine distance?
+  - is it a retrieval parameter?
+    - top_k?
+  - are the results discarded post-retrieval?
+- good retrieval requires good technique
+- can an evaluation step help?
+- retrieval as tool for an agent?
+**** Tools
+***** Vector Stores
+****** Chroma DB
+- fine for in-memory use only, persistence requires something different
+- LlamaIndex's Index abstraction can load/save to/from disk
+****** Lance DB
+- initialization requires schema or data from which to infer it
+***** Frameworks (LangChain v. LlamaIndex)
+****** API / Design
+- LangChain's API is simpler, but more limiting thab LlamaIndex's
+****** Libraries
+- [[https://unstructured-io.github.io/unstructured/][unstructured.io]]'s so-called [[https://github.com/Unstructured-IO/unstructured/blob/1947375b2eee8477f7ac95f55783b8262cb90ca9/unstructured/partition/org.py#L4][org-mode support]] is disappointing
+  - uses [[https://github.com/JessicaTegner/pypandoc#usage][pypandoc]] under the hood
+  - parses as HTML
+  - identifies headings and lists, but none of org's richness
+    - code blocks, properties, etc
+****** Documentation
+- LangChain's API docs are [[https://api.python.langchain.com/en/stable/langchain_api_reference.html][well-organized]], readable and link to [[https://api.python.langchain.com/en/stable/_modules/langchain/agents/agent.html#Agent.aplan][source]]
+- LLamaIndex's core API docs [[https://docs.llamaindex.ai/en/stable/api_reference/indices/vector_store.html][easy enough]] to read
+  - don't link to source
+  - LlamaHub community docs are [[https://llamahub.ai/l/readers/llama-index-readers-file?from=readers][not]]
+- LlamaIndex's conceptual documentation is thorough, and decently organized
+  - structure is not perfectly consistent from section to section
+****** Community
+- LangChain has lots of [[https://api.python.langchain.com/en/stable/community_api_reference.html#][community packages]]
+- LlamaIndex has [[https://llamahub.ai/][LlamaHub]] community package implementations
+****** Tools
+******* Utilities
+- create-llama :: [[https://www.npmjs.com/package/create-llama][node-based]] bootstrapper for LlamaIndex ([[https://blog.llamaindex.ai/create-llama-a-command-line-tool-to-generate-llamaindex-apps-8f7683021191][blog]], [[https://youtu.be/GOv4arrbVi8?si=9-TEs-_SbKUnhgWx][video]])
+******* Observability
+- LangSmith :: freemium hosted observability tooling ([[https://docs.smith.langchain.com/][docs]])
+  - limit 1 project for free "Developer" plan
+- DeepEval :: open-source observability for LLM apps ([[https://github.com/confident-ai/deepeval][Github]], [[https://docs.confident-ai.com/][docs]])
+- openllmetry :: freemium? open-source observability ([[https://github.com/traceloop/openllmetry][Github]], [[https://www.traceloop.com/docs/openllmetry/introduction][docs]])
+- Arize Phoneix :: ooh pretty! ([[https://github.com/Arize-ai/phoenix][Github]], [[https://docs.arize.com/phoenix][docs]])
+-  ::
 *** Future Work
 - persist my index to a proper vector database
 - periodically update my index `org-rag --refresh`
@@ -175,3 +234,4 @@ conda run -n llama-org-rag python3 "${HOME}/src/projects/llama-org-rag/rag.py" "
   - a basic tool to get the current date and possibly holiday calendars
   - send email or text messages
 - wire this up to an Emacs command
+- look at [[https://blog.streamlit.io/build-a-chatbot-with-custom-data-sources-powered-by-llamaindex/][different UIs]]
