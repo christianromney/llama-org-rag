@@ -2,15 +2,10 @@ from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
 from llama_index.core import StorageContext, load_index_from_storage
 from llama_index.core.embeddings import resolve_embed_model
 from llama_index.llms.ollama import Ollama
-import os
+import os, getopt, sys
 
 Settings.embed_model = resolve_embed_model("local:BAAI/bge-small-en-v1.5")
 Settings.llm = Ollama(model="mistral", request_timeout=30.0)
-
-def acknowledged(question):
-  "Returns true if the answer to the question is 'y'."
-  answer = input(question +  "(y|n)? " )
-  return answer.lower().strip()[0] == "y"
 
 def log(message):
   "Prints a message iff verbose is True"
@@ -33,13 +28,19 @@ class DocumentIndex:
       self.save()
 
   def refresh(self):
+    "Refreshes the index from the updated documents and saves to disk."
     log("Refreshing index with changed documents")
     self.index.refresh(self.documents)
     self.save()
 
   def save(self):
+    "Saves the index to disk under the given directory."
     log("Saving index to disk")
     self.index.storage_context.persist(persist_dir=self.path)
+
+  def query(self, q):
+    "Returns the response to the given query."
+    return self.index.as_query_engine().query(q)
 
   def chat(self, mode="context", stream=True):
     engine = self.index.as_chat_engine(chat_mode=mode, streaming=stream)
@@ -47,11 +48,41 @@ class DocumentIndex:
     return engine
 
 if __name__ == "__main__":
+  # default values
   verbose = False
-  index = DocumentIndex("/Users/christian/Documents/personal/notes/content/")
-  engine = index.chat()
+  interactive = False
+  refresh = False
+  query = ''
+  directory = "/Users/christian/Documents/personal/notes/content/"
 
-  if acknowledged("Refresh index"):
-    index.refresh()
+  arguments = sys.argv[1:]
+  short_opts = 'virq:d:'
+  long_opts = ['verbose', 'interactive', 'refresh', 'query=', 'directory=']
 
-  log("Goodbye.")
+  try:
+    opts, _args = getopt.getopt(arguments, short_opts, long_opts)
+    for opt, arg in opts:
+      if opt in ('-v', '--verbose'):
+        verbose = True
+      elif opt in ('-i', '--interactive'):
+        interactive = True
+      elif opt in ('-r', '--refresh'):
+        refresh = True
+      elif opt in ('-q', '--query'):
+        query = arg
+      elif opt in ('-d', '--directory'):
+        directory = arg
+
+    index = DocumentIndex(directory)
+    if interactive:
+      index.chat()
+    elif query:
+      print(index.query(query))
+
+    if refresh:
+      index.refresh()
+
+    log("Goodbye.")
+  except getopt.GetoptError as err:
+    print(str(err))
+    sys.exit(2)
