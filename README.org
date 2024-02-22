@@ -98,8 +98,13 @@ class DocumentIndex:
     log("Saving index to disk")
     self.index.storage_context.persist(persist_dir=self.path)
 
-  def query(self, q):
-    "Returns the response to the given query."
+  def print_files(self):
+    "Prints the list of all files in the index."
+    files = [info.metadata["file_path"] for info in self.index.ref_doc_info.values()]
+    print("\n".join(files))
+
+ def query(self, q):
+   "Returns the response to the given query."
     return self.index.as_query_engine().query(q)
 
   def chat(self, mode="context", stream=True):
@@ -112,12 +117,13 @@ if __name__ == "__main__":
   verbose = False
   interactive = False
   refresh = False
+  listing = False
   query = ''
   directory = "/Users/christian/Documents/personal/notes/content/"
 
   arguments = sys.argv[1:]
-  short_opts = 'virq:d:'
-  long_opts = ['verbose', 'interactive', 'refresh', 'query=', 'directory=']
+  short_opts = 'virlq:d:'
+  long_opts = ['verbose', 'interactive', 'refresh', 'list', 'query=', 'directory=']
 
   try:
     opts, _args = getopt.getopt(arguments, short_opts, long_opts)
@@ -128,13 +134,17 @@ if __name__ == "__main__":
         interactive = True
       elif opt in ('-r', '--refresh'):
         refresh = True
+      elif opt in ('-l', '--list'):
+        listing = True
       elif opt in ('-q', '--query'):
         query = arg
       elif opt in ('-d', '--directory'):
         directory = arg
 
     index = DocumentIndex(directory)
-    if interactive:
+    if listing:
+      index.print_files()
+    elif interactive:
       index.chat()
     elif query:
       print(index.query(query))
