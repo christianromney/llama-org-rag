@@ -1,6 +1,5 @@
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
 from llama_index.core import Document, StorageContext, load_index_from_storage
-from llama_index.core.readers.base import BaseReader
 from llama_index.core.embeddings import resolve_embed_model
 from llama_index.llms.ollama import Ollama
 import os, getopt, sys
