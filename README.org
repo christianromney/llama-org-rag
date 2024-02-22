@@ -109,9 +109,8 @@ class DocumentIndex:
     return self.index.as_query_engine().query(q)
 
   def chat(self, mode="context", stream=True):
-    engine = self.index.as_chat_engine(chat_mode=mode, streaming=stream)
-    engine.streaming_chat_repl()
-    return engine
+    self.index.as_chat_engine(chat_mode=mode,
+                              streaming=stream).streaming_chat_repl()
 
 if __name__ == "__main__":
   # default values
@@ -167,7 +166,30 @@ uses the python program above to perform the RAG query.
 conda run -n llama-org-rag python3 "${HOME}/src/projects/llama-org-rag/rag.py" "$@"
 #+end_src
 
+*** Output
+
+Figure 1. List of all indexed files
+[[file:img/list.png]]
+
+Figure 2. Refreshing the disk index with novelty
+[[file:img/refresh.png]]
+
+Figure 3. One-shot query (suitable for automation)
+[[file:img/query.png]]
+
+Figure 4. Interactive chat
+[[file:img/interactive.png]]
+
 *** Impressions
+This section captures what I learned from this experiment. Overall, I think
+there's a lot of promise in semantic, generative search over my documents. I
+need to learn more about techniques people use to get better results from RAG,
+and there are lots of papers from which to draw
+[cite:@barnett-SevenFailurePointsRAG-2024].
+
+I'm slightly disappointed in the LangChain API, Chroma DB, and Unstructured. I
+prefer LlamaIndex's API, though its docs are not as good as LangChain's.
+
 **** Techniques
 ***** RAG
 - simplistic retrieval misses lots of relevant content

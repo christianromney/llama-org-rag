@@ -49,9 +49,8 @@ class DocumentIndex:
     return self.index.as_query_engine().query(q)
 
   def chat(self, mode="context", stream=True):
-    engine = self.index.as_chat_engine(chat_mode=mode, streaming=stream)
-    engine.streaming_chat_repl()
-    return engine
+    self.index.as_chat_engine(chat_mode=mode,
+                              streaming=stream).streaming_chat_repl()
 
 if __name__ == "__main__":
   # default values
