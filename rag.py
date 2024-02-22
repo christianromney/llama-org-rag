@@ -43,8 +43,8 @@ class DocumentIndex:
     files = [info.metadata["file_path"] for info in self.index.ref_doc_info.values()]
     print("\n".join(files))
 
- def query(self, q):
-   "Returns the response to the given query."
+  def query(self, q):
+    "Returns the response to the given query."
     return self.index.as_query_engine().query(q)
 
   def chat(self, mode="context", stream=True):
