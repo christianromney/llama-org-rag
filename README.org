@@ -224,7 +224,7 @@ conda run -n llama-org-rag python3 "${HOME}/src/projects/llama-org-rag/rag.py" "
 - DeepEval :: open-source observability for LLM apps ([[https://github.com/confident-ai/deepeval][Github]], [[https://docs.confident-ai.com/][docs]])
 - openllmetry :: freemium? open-source observability ([[https://github.com/traceloop/openllmetry][Github]], [[https://www.traceloop.com/docs/openllmetry/introduction][docs]])
 - Arize Phoneix :: ooh pretty! ([[https://github.com/Arize-ai/phoenix][Github]], [[https://docs.arize.com/phoenix][docs]])
--  ::
+
 *** Future Work
 - persist my index to a proper vector database
 - periodically update my index `org-rag --refresh`
