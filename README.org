@@ -58,6 +58,7 @@ The following code uses LlamaIndex to perform Retrieval Augmented Generation (RA
 over my org-mode documents.
 
 #+begin_src python :tangle rag.py
+from deepeval.integrations.llama_index import DeepEvalContextualRelevancyEvaluator
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
 from llama_index.core import Document, StorageContext, load_index_from_storage
 from llama_index.core.embeddings import resolve_embed_model
@@ -65,7 +66,7 @@ from llama_index.llms.ollama import Ollama
 import os, getopt, sys
 
 Settings.embed_model = resolve_embed_model("local:BAAI/bge-small-en-v1.5")
-Settings.llm = Ollama(model="mistral", request_timeout=30.0)
+Settings.llm = Ollama(model="gemma", request_timeout=30.0)
 
 def log(message):
   "Prints a message iff verbose is True"
@@ -104,9 +105,24 @@ class DocumentIndex:
     files = [info.metadata["file_path"] for info in self.index.ref_doc_info.values()]
     print("\n".join(files))
 
-  def query(self, q):
+  def query(self, q, evaluate_result=False):
     "Returns the response to the given query."
-    return self.index.as_query_engine().query(q)
+    result = self.index.as_query_engine().query(q)
+    print(result)
+    if not evaluate_result:
+      return {'response': result}
+    else:
+      judge = DeepEvalContextualRelevancyEvaluator()
+      evaluation = judge.evaluate_response(query=q, response=result)
+
+      print(f"""
+DeepEval Contextual Relevancy
+-----------------------------
+Score: {evaluation.score}
+Explanation:
+{evaluation.feedback}
+      """)
+      return {'response': result, 'evaluation': evaluation}
 
   def chat(self, mode="context", stream=True):
     self.index.as_chat_engine(chat_mode=mode,
@@ -118,12 +134,13 @@ if __name__ == "__main__":
   interactive = False
   refresh = False
   listing = False
+  evaluate = False
   query = ''
   directory = "/Users/christian/Documents/personal/notes/content/"
 
   arguments = sys.argv[1:]
-  short_opts = 'virlq:d:'
-  long_opts = ['verbose', 'interactive', 'refresh', 'list', 'query=', 'directory=']
+  short_opts = 'virleq:d:'
+  long_opts = ['verbose', 'interactive', 'refresh', 'list', 'eval', 'query=', 'directory=']
 
   try:
     opts, _args = getopt.getopt(arguments, short_opts, long_opts)
@@ -136,6 +153,8 @@ if __name__ == "__main__":
         refresh = True
       elif opt in ('-l', '--list'):
         listing = True
+      elif opt in ('-e', '--eval'):
+        evaluate = True
       elif opt in ('-q', '--query'):
         query = arg
       elif opt in ('-d', '--directory'):
@@ -147,7 +166,7 @@ if __name__ == "__main__":
     elif interactive:
       index.chat()
     elif query:
-      print(index.query(query))
+      index.query(query, evaluate_result=evaluate)
 
     if refresh:
       index.refresh()
