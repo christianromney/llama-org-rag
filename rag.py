@@ -59,6 +59,7 @@ class DocumentIndex:
 DeepEval Contextual Relevancy
 -----------------------------
 Score: {evaluation.score}
+Contexts: {evaluation.contexts}
 Explanation:
 {evaluation.feedback}
       """)
