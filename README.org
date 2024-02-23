@@ -259,12 +259,14 @@ prefer LlamaIndex's API, though its docs are not as good as LangChain's.
 - Arize Phoneix :: ooh pretty! ([[https://github.com/Arize-ai/phoenix][Github]], [[https://docs.arize.com/phoenix][docs]])
 
 *** Future Work
-- persist my index to a proper vector database
-- periodically update my index `org-rag --refresh`
-- convert this to a full-fledged agent with access to tools
-  - use LLMCompiler to leverage LLMs planning abilities
-  - tools should include Google, Wikipedia, and Wolfram Alpha
-  - a basic tool to get the current date and possibly holiday calendars
-  - send email or text messages
-- wire this up to an Emacs command
-- look at [[https://blog.streamlit.io/build-a-chatbot-with-custom-data-sources-powered-by-llamaindex/][different UIs]]
+- [X] +add result evaluation using a secondary LLM (chatgpt-4-turbo-preview)+
+- [ ] experiment with different retrieval parameters
+- [ ] experiment with better retrieval techniques / architectures (e.g. Crew AI)
+- [ ] persist my index to a proper vector database
+- [ ] convert this to a full-fledged agent with access to tools
+  - [ ] use LLMCompiler to leverage LLMs planning abilities
+  - [ ] tools should include Google, Wikipedia, and Wolfram Alpha
+  - [ ] a basic tool to get the current date and possibly holiday calendars
+- [ ] wire this up to an Emacs command
+  - [ ] periodically update my index `org-rag --refresh`
+- [ ] evaluate [[https://blog.streamlit.io/build-a-chatbot-with-custom-data-sources-powered-by-llamaindex/][different UIs]]
