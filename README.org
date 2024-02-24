@@ -329,8 +329,12 @@ need to learn more about techniques people use to get better results from RAG,
 and there are lots of papers from which to draw
 [cite:@barnett-SevenFailurePointsRAG-2024].
 
-I'm slightly disappointed in the LangChain API, Chroma DB, and Unstructured. I
-prefer LlamaIndex's API, though its docs are not as good as LangChain's.
+- I'm slightly disappointed in the LangChain API, Chroma DB, and Unstructured.
+- I prefer LlamaIndex's API, though its docs are not as good as LangChain's.
+- I dislike Sphinx documentation generally.
+- I like pdoc API documentation very much.
+- It's easy to forget LLMs don't know simple things, like the current date.
+- LlamaIndex refreshing seems broken.
 
 *** Future Work
 - [X] +add result evaluation using a secondary LLM (chatgpt-4-turbo-preview)+ using
