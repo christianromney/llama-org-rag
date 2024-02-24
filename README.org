@@ -1,49 +1,52 @@
 #+TITLE: org-mode RAG Project with LlamaIndex
 * Overview
-This is my second attempt to index my org-mode files to support semantic search
-and RAG.
-
-** Vector Database
-My previous experiments with Chroma were unsuccessful (embeddings weren't
-associated with the org-file content). This version leverages LlamaIndex's
-ability to persist an index as files on disk directly without need for a vector
-store. Future versions may leverage a proper vector database such as Lance DB,
-Qdrant, or Weaviate (embedded).
-
+This project is a proof of concept for a tool to index my org-mode files to
+support semantic search using LlamaIndex.
 ** LlamaIndex
 *** Setup
-In a fresh conda environment, install the basic dependencies for this project
-with:
+In a fresh conda environment, install the basic dependencies for this project:
+
 #+begin_src shell
-pip3 install -r requirements.txt
+pip3 install llama-index llama-index-llms-ollama huggingface-hub
 #+end_src
-
-*** Concepts
-**** RAG Phases
-***** Ingestion
-- loading information from data sources (Documents comprised of Nodes)
+*** Conceptual Overview
+**** Retrieval Augmented Generation (RAG)
+Capitalized nouns in this section correspond to LlamaIndex classes
+***** Loading (Reading)
+- reading source information from data source(s)
 - Connectors (aka Readers) know how to ingest particular formats and sources of data
-****** Document
-- an abstraction that acts like generic container for data
-- also tracks metadata and relationships among data (e.g. parent/child or related Docs/Nodes)
-****** Node
-- a chunk of a source Document
-- inherit Document metadata
-
+  - e.g. SimpleDirectoryReader
+- Document is an abstraction that acts like generic container for loaded data
+  - tracks metadata and relationships among data
+  - example metadata: file attributes, parent/child relationships
+***** Transforming
+- splitting or chunking Documents into Nodes
+  - by sentence, character, token, semantic chunk
+  - inherit Document metadata
 ***** Indexing
-- Indexes are data structures that support efficient retrieval and query,
+- Indices are data structures that support efficient retrieval and query,
   particularly /semantic/ query
-- uses vector Embeddings, which map words to numerical vectors such that related
+- use vector Embeddings, which map words to numerical vectors such that related
   concepts are nearby in the vector space
-***** Storage
-- persist embeddings, content, and metadata durably, often in a vector database
-***** Query
-- Retrievers fetch context from an index to feed context of an LLM query
+- calculating Embeddings for each Node and associating them
+***** Storing
+- persisting the index durably
+- Indices can persist via their Storage Context directly to files on disk or
+- can use some vector store / database
+***** Retrieving
+- Retrievers fetch Nodes from an index
 - Routers select the optimal retriever from one or more possible choices
-- Node Post-processors transform retrieved nodes (e.g. filtering, re-ranking)
-- Response synthesizer generates a response from an LLM using a query and
-  retrieved data (orchestration?)
-**** Composition
+- embed a query and perform a similarity search against an index (possibly
+  backed by a store)
+- return top_k relevant Nodes
+***** Node Post-Processing
+- filter, augment, or reorder each node according to some criteria
+***** Augmented Generation
+- embed post-processed nodes into LLM context
+  - llm prompt contains:
+    - system prompt, retrieved nodes*, prior messages*, query
+- Response Synthesizer generates a response from an LLM using a query and
+  retrieved data
 ***** Query Engine
 - end-to-end pipeline for producing a response to a query using an LLM and
   retrieved content
@@ -53,95 +56,164 @@ pip3 install -r requirements.txt
 - automated *decision maker* powered by an LLM that interacts with the world using
   Tools
 
-*** Proof of Concept (Python)
-The following code uses LlamaIndex to perform Retrieval Augmented Generation (RAG)
-over my org-mode documents.
 
+*** Tools and Libraries
+**** Vector Stores
+***** Chroma DB
+- in memory or embedded (sqlite) vector db
+- experience showed sqlite embeddings get "stuck" in a queue table
+***** Lance DB
+- embedded vector db
+- initialization requires schema or data from which to infer it
+***** Qdrant
+- containerized or hosted vector db
+***** Weaviate
+- popular containerized, embedded, or hosted vector db
+**** LangChain v. LlamaIndex Impressions
+***** API / Design
+- LangChain's API is simpler, but seems more limiting than LlamaIndex's
+***** Documentation
+- LangChain's API docs are [[https://api.python.langchain.com/en/stable/langchain_api_reference.html][well-organized]], readable and link to [[https://api.python.langchain.com/en/stable/_modules/langchain/agents/agent.html#Agent.aplan][source]]
+- LLamaIndex's core API docs just [[https://docs.llamaindex.ai/en/stable/api_reference/indices/vector_store.html][ok]] to read
+  - don't like organization
+    - prefer package/class listing like Javadoc
+  - don't link to source
+***** Community
+- LangChain has lots of [[https://api.python.langchain.com/en/stable/community_api_reference.html#][community packages]]
+- LlamaIndex has [[https://llamahub.ai/][LlamaHub]] community package implementations
+***** Utilities
+- create-llama :: [[https://www.npmjs.com/package/create-llama][node-based]] bootstrapper for LlamaIndex ([[https://blog.llamaindex.ai/create-llama-a-command-line-tool-to-generate-llamaindex-apps-8f7683021191][blog]], [[https://youtu.be/GOv4arrbVi8?si=9-TEs-_SbKUnhgWx][video]])
+***** Observability
+- LangSmith :: freemium hosted observability tooling ([[https://docs.smith.langchain.com/][docs]])
+  - limit 1 project for free "Developer" plan
+- DeepEval :: open-source observability for LLM apps ([[https://github.com/confident-ai/deepeval][Github]], [[https://docs.confident-ai.com/][docs]])
+  - unit tests can report to Confident-AI (freemium like LangSmith)
+  - metrics can be used with any framework
+  - LlamaIndex Evaluators included
+- openllmetry :: freemium? open-source observability ([[https://github.com/traceloop/openllmetry][Github]], [[https://www.traceloop.com/docs/openllmetry/introduction][docs]])
+- Arize Phoneix :: ooh pretty! ([[https://github.com/Arize-ai/phoenix][Github]], [[https://docs.arize.com/phoenix][docs]])
+**** Miscellaneous Libraries
+- [[https://unstructured-io.github.io/unstructured/][unstructured.io]]'s so-called [[https://github.com/Unstructured-IO/unstructured/blob/1947375b2eee8477f7ac95f55783b8262cb90ca9/unstructured/partition/org.py#L4][org-mode support]] is disappointing
+  - uses [[https://github.com/JessicaTegner/pypandoc#usage][pypandoc]] under the hood
+  - parses as HTML
+  - identifies headings and lists, but none of org's richness
+    - code blocks, properties, etc
+*** RAG Proof of Concept (Python)
+The following code uses LlamaIndex to perform Retrieval Augmented Generation (RAG)
+over my org-mode documents (org-roam notes, org todos and org agenda).
 #+begin_src python :tangle rag.py
-from deepeval.integrations.llama_index import DeepEvalContextualRelevancyEvaluator
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
-from llama_index.core import Document, StorageContext, load_index_from_storage
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+from llama_index.core import StorageContext, load_index_from_storage
+from llama_index.core import Settings, get_response_synthesizer
+from llama_index.core.retrievers import VectorIndexRetriever
+from llama_index.core.postprocessor import SimilarityPostprocessor
+from llama_index.core.postprocessor import FixedRecencyPostprocessor
+from llama_index.core.query_engine import CitationQueryEngine
+from llama_index.core.chat_engine.condense_question import CondenseQuestionChatEngine
 from llama_index.core.embeddings import resolve_embed_model
 from llama_index.llms.ollama import Ollama
-import os, getopt, sys
+import os, getopt, sys, shutil
 
+# global settings
 Settings.embed_model = resolve_embed_model("local:BAAI/bge-small-en-v1.5")
-Settings.llm = Ollama(model="gemma", request_timeout=30.0)
+Settings.llm = Ollama(model="mistral", request_timeout=60.0)
 
+verbose=False
 def log(message):
   "Prints a message iff verbose is True"
   if verbose:
     print(message)
 
 class DocumentIndex:
-  def __init__(self, directory, progress=True, verbose=False):
+  def __init__(self, directory, exts=[".org"], progress=True,
+               verbose=False, max_top_k=10, top_k=5,
+               similarity_cutoff=0.6):
+    # load or create the index
     self.path = os.path.join(directory, ".llamaindex")
-    self.documents = SimpleDirectoryReader(input_dir=directory,
-                                           recursive=True,
-                                           required_exts=[".org"]).load_data()
     if os.path.exists(self.path):
       context= StorageContext.from_defaults(persist_dir=self.path)
       log("Loading index from disk")
       self.index = load_index_from_storage(context)
     else:
       log("Creating new index")
-      self.index = VectorStoreIndex.from_documents(self.documents,
-                                                   show_progress=progress)
-      self.save()
+      docs = SimpleDirectoryReader(input_dir=directory,
+                                   recursive=True,
+                                   required_exts=exts).load_data()
+      log(f"Read {len(docs)} {', '.join(exts)} docs from {directory}.")
+      index = VectorStoreIndex.from_documents(docs, show_progress=progress)
+      index.storage_context.persist(persist_dir=self.path)
+      self.index = index
 
-  def refresh(self):
-    "Refreshes the index from the updated documents and saves to disk."
-    log("Refreshing index with changed documents")
-    self.index.refresh(self.documents)
-    self.save()
+    # post-processors filter the nodes returned from the similarity search
+    # prior to creating the context for the LLM call
+    self.post_processors = [
+      SimilarityPostprocessor(similarity_cutoff=similarity_cutoff),
+      FixedRecencyPostprocessor(top_k=top_k, date_key='last_modified_date')
+    ]
 
-  def save(self):
-    "Saves the index to disk under the given directory."
-    log("Saving index to disk")
-    self.index.storage_context.persist(persist_dir=self.path)
+    # compact and refine synthesizer
+    self.response_synth = get_response_synthesizer()
+
+    self.query_engine = CitationQueryEngine(
+      retriever=VectorIndexRetriever(
+        index=self.index, similarity_top_k=top_k,
+        max_top_k=max_top_k),
+      response_synthesizer=self.response_synth,
+      node_postprocessors=self.post_processors
+    )
+    self.chat_engine = CondenseQuestionChatEngine.from_defaults(
+      query_engine=self.query_engine
+    )
+
+  def delete_index(self):
+    "Deletes the index folder and all files"
+    shutil.rmtree(self.path)
 
   def print_files(self):
     "Prints the list of all files in the index."
     files = [info.metadata["file_path"] for info in self.index.ref_doc_info.values()]
     print("\n".join(files))
 
-  def query(self, q, evaluate_result=False):
-    "Returns the response to the given query."
-    result = self.index.as_query_engine().query(q)
-    print(result)
-    if not evaluate_result:
-      return {'response': result}
-    else:
-      judge = DeepEvalContextualRelevancyEvaluator()
-      evaluation = judge.evaluate_response(query=q, response=result)
+  def _print_retrieved_item(self, idx, item):
+    print(f"{idx}. file: {item.node.metadata['file_path']}")
+    print(f"   size: {item.node.metadata['file_size']}")
+    print(f"   score: {round(item.score, 3)}")
+    print(f"   embedding: {item.node.embedding}")
 
-      print(f"""
-DeepEval Contextual Relevancy
------------------------------
-Score: {evaluation.score}
-Contexts: {evaluation.contexts}
-Explanation:
-{evaluation.feedback}
-      """)
-      return {'response': result, 'evaluation': evaluation}
+  def _print_retrieved_items(self, items):
+    heading = f"\nRetrieved {len(items)} Nodes"
+    dashes = "-" * len(heading)
+    print(f"{heading}\n{dashes}")
+    for i in range(len(items)):
+      self._print_retrieved_item(i + 1, items[i])
+
+  def print_retrieved(self, q):
+    "Print nodes retrieved from the index."
+    items = self.query_engine.retriever.retrieve(q)
+    self._print_retrieved_items(items)
+
+  def query(self, q, evaluate_result=False):
+    "Prints the response to the given query."
+    print(self.query_engine.query(q))
 
   def chat(self, mode="context", stream=True):
-    self.index.as_chat_engine(chat_mode=mode,
-                              streaming=stream).streaming_chat_repl()
+    "Starts a chat repl."
+    self.chat_engine.streaming_chat_repl()
 
 if __name__ == "__main__":
   # default values
-  verbose = False
   interactive = False
-  refresh = False
+  print_retrieved = False
   listing = False
   evaluate = False
   query = ''
   directory = "/Users/christian/Documents/personal/notes/content/"
 
+  # argument parsing
   arguments = sys.argv[1:]
-  short_opts = 'virleq:d:'
-  long_opts = ['verbose', 'interactive', 'refresh', 'list', 'eval', 'query=', 'directory=']
+  short_opts = 'vipleq:d:'
+  long_opts = ['verbose', 'interactive', 'print-retrieved',
+               'list', 'eval', 'query=', 'directory=']
 
   try:
     opts, _args = getopt.getopt(arguments, short_opts, long_opts)
@@ -150,8 +222,8 @@ if __name__ == "__main__":
         verbose = True
       elif opt in ('-i', '--interactive'):
         interactive = True
-      elif opt in ('-r', '--refresh'):
-        refresh = True
+      elif opt in ('-p', '--print-retrieved'):
+        print_retrieved = True
       elif opt in ('-l', '--list'):
         listing = True
       elif opt in ('-e', '--eval'):
@@ -161,18 +233,18 @@ if __name__ == "__main__":
       elif opt in ('-d', '--directory'):
         directory = arg
 
+    # RAG class
     index = DocumentIndex(directory)
+
+    # dispatch action
     if listing:
       index.print_files()
     elif interactive:
-      index.chat()
+      agent.chat()
     elif query:
       index.query(query, evaluate_result=evaluate)
-
-    if refresh:
-      index.refresh()
-
-    log("Goodbye.")
+      if print_retrieved:
+        index.print_retrieved(query)
   except getopt.GetoptError as err:
     print(str(err))
     sys.exit(2)
@@ -184,6 +256,56 @@ uses the Python program above to perform the RAG query.
 #+begin_src shell :tangle ~/bin/org-rag
 #!/usr/bin/env bash
 conda run -n llama-org-rag python3 "${HOME}/src/projects/llama-org-rag/rag.py" "$@"
+#+end_src
+
+*** Agent Exploration(WIP)
+I want to try leveraging the RAG capability from an agent that can also access
+the web and specialized functions to augment its context.
+
+#+begin_src python :tangle agent.py
+from llama_index.core.tools import FunctionTool, QueryEngineTool, ToolMetadata
+from llama_index.core.agent import ReActAgent
+from llama_index.llms.ollama import Ollama
+from llama_index.core import Settings
+import pytz
+
+# Agent Tools
+def current_date() -> str:
+  "Gets the current time as a string."
+  return datetime.now(pytz.timezone("US/Eastern")).strftime("%A, %B %d, %Y")
+
+def current_time() -> str:
+  "Gets the current time as a string."
+  return datetime.now(pytz.timezone("US/Eastern")).strftime("%I:%M%p %Z")
+
+llm = Ollama(model="mistral", request_timeout=60.0)
+query_engine = None # TODO: this is not working yet
+
+toolbox = [
+  FunctionTool.from_defaults(
+    fn=current_date,
+    name="current_date",
+    description=(
+      "Returns today's date."
+    )
+  ),
+  FunctionTool.from_defaults(
+    fn=current_time,
+    name="current_time",
+    description=(
+      "Returns the current time."
+    )
+  ),
+  QueryEngineTool.from_defaults(
+    query_engine=query_engine,
+    name="my_notes",
+    description=(
+      "Returns information about my personal org-mode notes and todo list items."
+      "Use a detailed plain text question as input to the tool."
+    )
+  )
+]
+agent = ReActAgent.from_tools(toolbox, llm=Settings.llm, verbose=True)
 #+end_src
 
 *** Output
@@ -210,62 +332,13 @@ and there are lots of papers from which to draw
 I'm slightly disappointed in the LangChain API, Chroma DB, and Unstructured. I
 prefer LlamaIndex's API, though its docs are not as good as LangChain's.
 
-**** Techniques
-***** RAG
-- simplistic retrieval misses lots of relevant content
-- [[https://docs.llamaindex.ai/en/stable/module_guides/observability/observability.html][observability]] is needed to understand cause
-  - is it an embedding problem?
-    - dissimilarity?
-    - cosine distance?
-  - is it a retrieval parameter?
-    - top_k?
-  - are the results discarded post-retrieval?
-- good retrieval requires good technique
-- can an evaluation step help?
-- retrieval as tool for an agent?
-**** Tools
-***** Vector Stores
-****** Chroma DB
-- fine for in-memory use only, persistence requires something different
-- LlamaIndex's Index abstraction can load/save to/from disk
-****** Lance DB
-- initialization requires schema or data from which to infer it
-***** Frameworks (LangChain v. LlamaIndex)
-****** API / Design
-- LangChain's API is simpler, but more limiting than LlamaIndex's
-****** Libraries
-- [[https://unstructured-io.github.io/unstructured/][unstructured.io]]'s so-called [[https://github.com/Unstructured-IO/unstructured/blob/1947375b2eee8477f7ac95f55783b8262cb90ca9/unstructured/partition/org.py#L4][org-mode support]] is disappointing
-  - uses [[https://github.com/JessicaTegner/pypandoc#usage][pypandoc]] under the hood
-  - parses as HTML
-  - identifies headings and lists, but none of org's richness
-    - code blocks, properties, etc
-****** Documentation
-- LangChain's API docs are [[https://api.python.langchain.com/en/stable/langchain_api_reference.html][well-organized]], readable and link to [[https://api.python.langchain.com/en/stable/_modules/langchain/agents/agent.html#Agent.aplan][source]]
-- LLamaIndex's core API docs [[https://docs.llamaindex.ai/en/stable/api_reference/indices/vector_store.html][easy enough]] to read
-  - don't link to source
-  - LlamaHub community docs are [[https://llamahub.ai/l/readers/llama-index-readers-file?from=readers][not]]
-- LlamaIndex's conceptual documentation is thorough, and decently organized
-  - structure is not perfectly consistent from section to section
-****** Community
-- LangChain has lots of [[https://api.python.langchain.com/en/stable/community_api_reference.html#][community packages]]
-- LlamaIndex has [[https://llamahub.ai/][LlamaHub]] community package implementations
-****** Tools
-******* Utilities
-- create-llama :: [[https://www.npmjs.com/package/create-llama][node-based]] bootstrapper for LlamaIndex ([[https://blog.llamaindex.ai/create-llama-a-command-line-tool-to-generate-llamaindex-apps-8f7683021191][blog]], [[https://youtu.be/GOv4arrbVi8?si=9-TEs-_SbKUnhgWx][video]])
-******* Observability
-- LangSmith :: freemium hosted observability tooling ([[https://docs.smith.langchain.com/][docs]])
-  - limit 1 project for free "Developer" plan
-- DeepEval :: open-source observability for LLM apps ([[https://github.com/confident-ai/deepeval][Github]], [[https://docs.confident-ai.com/][docs]])
-- openllmetry :: freemium? open-source observability ([[https://github.com/traceloop/openllmetry][Github]], [[https://www.traceloop.com/docs/openllmetry/introduction][docs]])
-- Arize Phoneix :: ooh pretty! ([[https://github.com/Arize-ai/phoenix][Github]], [[https://docs.arize.com/phoenix][docs]])
-
 *** Future Work
-- [X] +add result evaluation using a secondary LLM (chatgpt-4-turbo-preview)+
-- [ ] experiment with different retrieval parameters
-- [ ] experiment with better retrieval techniques / architectures (e.g. Crew AI)
+- [X] +add result evaluation using a secondary LLM (chatgpt-4-turbo-preview)+ using
+- [X] experiment with different retrieval parameters
 - [ ] persist my index to a proper vector database
+- [ ] experiment with better retrieval techniques / architectures (e.g. Crew AI)
 - [ ] convert this to a full-fledged agent with access to tools
-  - [ ] use LLMCompiler to leverage LLMs planning abilities
+  - [ ] use ReAct or LLMCompiler to leverage LLMs planning abilities
   - [ ] tools should include Google, Wikipedia, and Wolfram Alpha
   - [ ] a basic tool to get the current date and possibly holiday calendars
 - [ ] wire this up to an Emacs command
