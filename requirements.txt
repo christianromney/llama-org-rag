@@ -112,7 +112,7 @@ opentelemetry-proto==1.22.0
 opentelemetry-sdk==1.22.0
 opentelemetry-semantic-conventions==0.43b0
 opentelemetry-util-http==0.43b0
-orjson==3.9.14
+orjson==3.9.15
 overrides==7.7.0
 packaging @ file:///private/tmp/python-packaging-20231211-10905-adsfgp/packaging-23.2
 pandas==2.2.0
