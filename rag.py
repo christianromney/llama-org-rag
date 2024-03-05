@@ -17,7 +17,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.WARN)
 log = logging.getLogger()
 
 Settings.embed_model = resolve_embed_model("local:BAAI/bge-small-en-v1.5")
-Settings.llm = Ollama(model="mistral", request_timeout=60.0, temperature=0.5)
+Settings.llm = Ollama(model="mixtral", request_timeout=60.0, temperature=0.5)
 
 class DocumentIndex:
   def __init__(self, directory, exts=[".org"], progress=True,
