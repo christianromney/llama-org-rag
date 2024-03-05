@@ -17,7 +17,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.WARN)
 log = logging.getLogger()
 
 Settings.embed_model = resolve_embed_model("local:BAAI/bge-small-en-v1.5")
-Settings.llm = Ollama(model="mistral", request_timeout=60.0)
+Settings.llm = Ollama(model="mistral", request_timeout=60.0, temperature=0.5)
 
 class DocumentIndex:
   def __init__(self, directory, exts=[".org"], progress=True,
@@ -54,14 +54,14 @@ class DocumentIndex:
 
     # query engine
     template = (
-      "The following context draws from notes I have written:\n"
+      "The following context draws from notes and other documents I have written:\n"
       "---------------------\n"
       "{context_str}"
       "\n---------------------\n"
-      "Given that context, please answer this question: '{query_str}'\n."
-      "Always footnote any part of your answer which is drawn from a context document.\n"
-      "After your answer, produce an ordered list of those Footnotes\n"
-      "containing the file_path of the corresponding footnote.\n"
+      "Given that context, please answer this question: '{query_str}'\n\n"
+      "Always cite which of my documents you used to answer my question.\n"
+      "After your answer, produce an ordered list of those Citations\n"
+      "containing the file_path of the corresponding document.\n"
     )
     qa_template = PromptTemplate(template)
 
