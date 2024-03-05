@@ -1,0 +1,1 @@
+docker run -p 6333:6333 -p 6334:6334 -v /Users/christian/Documents/personal/qdrant:/qdrant/storage:z qdrant/qdrant
