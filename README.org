@@ -4,10 +4,10 @@ This project is a proof of concept for a tool to index my org-mode files to
 support semantic search using LlamaIndex.
 ** LlamaIndex
 *** Setup
-In a fresh conda environment, install the basic dependencies for this project:
+In a fresh virtual environment, install the basic dependencies for this project:
 
 #+begin_src shell
-pip3 install llama-index llama-index-llms-ollama huggingface-hub
+pip3 install -r requirements.txt
 #+end_src
 *** Conceptual Overview
 **** Retrieval Augmented Generation (RAG)
@@ -56,18 +56,32 @@ Capitalized nouns in this section correspond to LlamaIndex classes
 - automated *decision maker* powered by an LLM that interacts with the world using
   Tools
 
-
 *** Tools and Libraries
 **** Vector Stores
 ***** Chroma DB
 - in memory or embedded (sqlite) vector db
 - experience showed sqlite embeddings get "stuck" in a queue table
 ***** Lance DB
-- embedded vector db
+- embedded vector db persisted to files on disk and run from memory
 - initialization requires schema or data from which to infer it
 ***** Qdrant
 - containerized or hosted vector db
-***** Weaviate
+- easy setup and usage from llama-index
+- what is with the [[https://python-client.qdrant.tech/qdrant_client.http.models.models][horrible]] ui/readability choices for generated Python docs?
+  + no list of classes or methods (have to scroll or search the page)
+    * no link anchor / heading to each class or method when it does appear
+  + poor contrast grey-on-grey color scheme for class and method names
+  + if you ever needed an example of why types don't make everything better,
+    have fun deciphering this…
+    #+begin_example
+    shard_key_selector: Optional[Union[int[int], str[str], List[Union[int[int], str[str]]]]] = None
+    #+end_example
+- otoh, [[https://qdrant.github.io/qdrant/redoc/index.html#tag/collections][REST documentation]] is readable and navigable
+- would be nice to have a method for checking if a named collection exists
+  + ~get_collection(collection_name="foo")~ [[[https://python-client.qdrant.tech/_modules/qdrant_client/qdrant_client#QdrantClient.get_collection][source]]] throws if collection not
+    found
+- need to explore features
+***** TODO Weaviate
 - popular containerized, embedded, or hosted vector db
 **** LangChain v. LlamaIndex Impressions
 ***** API / Design
@@ -97,216 +111,9 @@ Capitalized nouns in this section correspond to LlamaIndex classes
   - uses [[https://github.com/JessicaTegner/pypandoc#usage][pypandoc]] under the hood
   - parses as HTML
   - identifies headings and lists, but none of org's richness
-    - code blocks, properties, etc
 *** RAG Proof of Concept (Python)
-The following code uses LlamaIndex to perform Retrieval Augmented Generation (RAG)
-over my org-mode documents (org-roam notes, org todos and org agenda).
-#+begin_src python :tangle rag.py
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
-from llama_index.core import StorageContext, load_index_from_storage
-from llama_index.core import Settings, get_response_synthesizer
-from llama_index.core.retrievers import VectorIndexRetriever
-from llama_index.core.postprocessor import SimilarityPostprocessor
-from llama_index.core.postprocessor import FixedRecencyPostprocessor
-from llama_index.core.query_engine import CitationQueryEngine
-from llama_index.core.chat_engine.condense_question import CondenseQuestionChatEngine
-from llama_index.core.embeddings import resolve_embed_model
-from llama_index.llms.ollama import Ollama
-import os, getopt, sys, shutil
-
-# global settings
-Settings.embed_model = resolve_embed_model("local:BAAI/bge-small-en-v1.5")
-Settings.llm = Ollama(model="mistral", request_timeout=60.0)
-
-verbose=False
-def log(message):
-  "Prints a message iff verbose is True"
-  if verbose:
-    print(message)
-
-class DocumentIndex:
-  def __init__(self, directory, exts=[".org"], progress=True,
-               verbose=False, max_top_k=10, top_k=5,
-               similarity_cutoff=0.6):
-    # load or create the index
-    self.path = os.path.join(directory, ".llamaindex")
-    if os.path.exists(self.path):
-      context= StorageContext.from_defaults(persist_dir=self.path)
-      log("Loading index from disk")
-      self.index = load_index_from_storage(context)
-    else:
-      log("Creating new index")
-      docs = SimpleDirectoryReader(input_dir=directory,
-                                   recursive=True,
-                                   required_exts=exts).load_data()
-      log(f"Read {len(docs)} {', '.join(exts)} docs from {directory}.")
-      index = VectorStoreIndex.from_documents(docs, show_progress=progress)
-      index.storage_context.persist(persist_dir=self.path)
-      self.index = index
-
-    # post-processors filter the nodes returned from the similarity search
-    # prior to creating the context for the LLM call
-    self.post_processors = [
-      SimilarityPostprocessor(similarity_cutoff=similarity_cutoff),
-      FixedRecencyPostprocessor(top_k=top_k, date_key='last_modified_date')
-    ]
-
-    # compact and refine synthesizer
-    self.response_synth = get_response_synthesizer()
-
-    self.query_engine = CitationQueryEngine(
-      retriever=VectorIndexRetriever(
-        index=self.index, similarity_top_k=top_k,
-        max_top_k=max_top_k),
-      response_synthesizer=self.response_synth,
-      node_postprocessors=self.post_processors
-    )
-    self.chat_engine = CondenseQuestionChatEngine.from_defaults(
-      query_engine=self.query_engine
-    )
-
-  def delete_index(self):
-    "Deletes the index folder and all files"
-    shutil.rmtree(self.path)
-
-  def print_files(self):
-    "Prints the list of all files in the index."
-    files = [info.metadata["file_path"] for info in self.index.ref_doc_info.values()]
-    print("\n".join(files))
-
-  def _print_retrieved_item(self, idx, item):
-    print(f"{idx}. file: {item.node.metadata['file_path']}")
-    print(f"   size: {item.node.metadata['file_size']}")
-    print(f"   score: {round(item.score, 3)}")
-    print(f"   embedding: {item.node.embedding}")
-
-  def _print_retrieved_items(self, items):
-    heading = f"\nRetrieved {len(items)} Nodes"
-    dashes = "-" * len(heading)
-    print(f"{heading}\n{dashes}")
-    for i in range(len(items)):
-      self._print_retrieved_item(i + 1, items[i])
-
-  def print_retrieved(self, q):
-    "Print nodes retrieved from the index."
-    items = self.query_engine.retriever.retrieve(q)
-    self._print_retrieved_items(items)
-
-  def query(self, q, evaluate_result=False):
-    "Prints the response to the given query."
-    print(self.query_engine.query(q))
-
-  def chat(self, mode="context", stream=True):
-    "Starts a chat repl."
-    self.chat_engine.streaming_chat_repl()
-
-if __name__ == "__main__":
-  # default values
-  interactive = False
-  print_retrieved = False
-  listing = False
-  evaluate = False
-  query = ''
-  directory = "/Users/christian/Documents/personal/notes/content/"
-
-  # argument parsing
-  arguments = sys.argv[1:]
-  short_opts = 'vipleq:d:'
-  long_opts = ['verbose', 'interactive', 'print-retrieved',
-               'list', 'eval', 'query=', 'directory=']
-
-  try:
-    opts, _args = getopt.getopt(arguments, short_opts, long_opts)
-    for opt, arg in opts:
-      if opt in ('-v', '--verbose'):
-        verbose = True
-      elif opt in ('-i', '--interactive'):
-        interactive = True
-      elif opt in ('-p', '--print-retrieved'):
-        print_retrieved = True
-      elif opt in ('-l', '--list'):
-        listing = True
-      elif opt in ('-e', '--eval'):
-        evaluate = True
-      elif opt in ('-q', '--query'):
-        query = arg
-      elif opt in ('-d', '--directory'):
-        directory = arg
-
-    # RAG class
-    index = DocumentIndex(directory)
-
-    # dispatch action
-    if listing:
-      index.print_files()
-    elif interactive:
-      agent.chat()
-    elif query:
-      index.query(query, evaluate_result=evaluate)
-      if print_retrieved:
-        index.print_retrieved(query)
-  except getopt.GetoptError as err:
-    print(str(err))
-    sys.exit(2)
-#+end_src
-
-The following shell script can be called easily (for example from Emacs) and
-uses the Python program above to perform the RAG query.
-
-#+begin_src shell :tangle ~/bin/org-rag
-#!/usr/bin/env bash
-conda run -n llama-org-rag python3 "${HOME}/src/projects/llama-org-rag/rag.py" "$@"
-#+end_src
-
-*** Agent Exploration(WIP)
-I want to try leveraging the RAG capability from an agent that can also access
-the web and specialized functions to augment its context.
-
-#+begin_src python :tangle agent.py
-from llama_index.core.tools import FunctionTool, QueryEngineTool, ToolMetadata
-from llama_index.core.agent import ReActAgent
-from llama_index.llms.ollama import Ollama
-from llama_index.core import Settings
-import pytz
-
-# Agent Tools
-def current_date() -> str:
-  "Gets the current time as a string."
-  return datetime.now(pytz.timezone("US/Eastern")).strftime("%A, %B %d, %Y")
-
-def current_time() -> str:
-  "Gets the current time as a string."
-  return datetime.now(pytz.timezone("US/Eastern")).strftime("%I:%M%p %Z")
-
-llm = Ollama(model="mistral", request_timeout=60.0)
-query_engine = None # TODO: this is not working yet
-
-toolbox = [
-  FunctionTool.from_defaults(
-    fn=current_date,
-    name="current_date",
-    description=(
-      "Returns today's date."
-    )
-  ),
-  FunctionTool.from_defaults(
-    fn=current_time,
-    name="current_time",
-    description=(
-      "Returns the current time."
-    )
-  ),
-  QueryEngineTool.from_defaults(
-    query_engine=query_engine,
-    name="my_notes",
-    description=(
-      "Returns information about my personal org-mode notes and todo list items."
-      "Use a detailed plain text question as input to the tool."
-    )
-  )
-]
-agent = ReActAgent.from_tools(toolbox, llm=Settings.llm, verbose=True)
-#+end_src
+The code in [[https://github.com/christianromney/llama-org-rag/blob/main/rag.py][rag.py]] uses LlamaIndex to perform Retrieval Augmented Generation
+(RAG) over my org-mode documents (org-roam notes, org todos and org agenda).
 
 *** Output
 
@@ -331,20 +138,26 @@ and there are lots of papers from which to draw
 
 - I'm slightly disappointed in the LangChain API, Chroma DB, and Unstructured.
 - I prefer LlamaIndex's API, though its docs are not as good as LangChain's.
-- I dislike Sphinx documentation generally.
-- I like pdoc API documentation very much.
+- I dislike Sphinx-generated Python documentation generally for its complexity,
+  layout, and theming.
+- I like pdoc API documentation very much for its simplicity and clean UI.
 - It's easy to forget LLMs don't know simple things, like the current date.
-- LlamaIndex refreshing seems broken.
+- LlamaIndex's on-disk persisted index refreshing seems broken, producing
+  duplicate embeddings.
 
 *** Future Work
 - [X] +add result evaluation using a secondary LLM (chatgpt-4-turbo-preview)+ using
 - [X] experiment with different retrieval parameters
-- [ ] persist my index to a proper vector database
+- [X] persist my index to a proper vector database
 - [ ] experiment with better retrieval techniques / architectures (e.g. Crew AI)
 - [ ] convert this to a full-fledged agent with access to tools
   - [ ] use ReAct or LLMCompiler to leverage LLMs planning abilities
   - [ ] tools should include Google, Wikipedia, and Wolfram Alpha
   - [ ] a basic tool to get the current date and possibly holiday calendars
-- [ ] wire this up to an Emacs command
-  - [ ] periodically update my index `org-rag --refresh`
+- [ ] improve result formatting consistency
+- [ ] improve discovery
+- [ ] improve performance (latency)
+- [ ] periodically update my index `org-rag --refresh` (upsert)
+- [ ] experiment with knowledge graph
+- [ ] wire this up to an Emacs command (JSON API?)
 - [ ] evaluate [[https://blog.streamlit.io/build-a-chatbot-with-custom-data-sources-powered-by-llamaindex/][different UIs]]
