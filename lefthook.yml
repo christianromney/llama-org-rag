@@ -9,3 +9,5 @@ pre-commit:
     lint:
       glob: "*.py"
       run: ruff check {staged_files}
+    doc:
+      run: git cliff -o CHANGELOG.md
