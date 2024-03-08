@@ -24,6 +24,10 @@ Now we can install this project's requirements with:
 #+begin_src shell
 pip install -r requirements.txt
 #+end_src
+**** Optional Tools
+I also use [[https://docs.astral.sh/ruff/][ruff]] for Python linting and formatting and [[https://github.com/evilmartians/lefthook][lefthook]] for Git hook
+management. The ~ruff.toml~ and ~lefthook.yml~ files in root directory contain their
+respective configurations.
 *** Conceptual Overview
 **** Retrieval Augmented Generation (RAG)
 Capitalized nouns in this section correspond to LlamaIndex classes
