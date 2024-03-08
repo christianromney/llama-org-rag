@@ -1,0 +1,11 @@
+# EXAMPLE USAGE:
+# https://github.com/evilmartians/lefthook/blob/master/docs/configuration.md
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: "*.py"
+      run: ruff format {staged_files}
+    lint:
+      glob: "*.py"
+      run: ruff check {staged_files}

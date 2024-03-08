@@ -9,46 +9,62 @@ from llama_index.llms.ollama import Ollama
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import ResponseHandlingException
-import os, getopt, sys, logging
+from argparse import ArgumentParser
+import os, sys, logging
 
 # global settings
-logging.basicConfig(stream=sys.stdout, level=logging.WARN)
+log_levels = {0: logging.ERROR, 1: logging.WARN, 2: logging.INFO, 3: logging.DEBUG}
+logging.basicConfig(
+  stream=sys.stdout,
+  format="[%(asctime)-15s] [%(levelname)s] %(name)-5s: %(message)s",
+  datefmt="%Y-%m-%dT%I:%M:%S%z",
+)
 log = logging.getLogger()
 
 Settings.embed_model = resolve_embed_model("local:BAAI/bge-small-en-v1.5")
-Settings.llm = Ollama(model="mixtral", request_timeout=60.0, temperature=0.4)
+Settings.llm = Ollama(model="mixtral", request_timeout=120.0, temperature=0.4)
+
 
 class DocumentIndex:
-  def __init__(self, directory, exts=[".org"], progress=True,
-               verbose=False, max_top_k=20, top_k=10,
-               similarity_cutoff=0.6):
+  def __init__(
+    self,
+    directory,
+    exts=[".org"],
+    progress=True,
+    verbose=False,
+    max_top_k=20,
+    top_k=10,
+    similarity_cutoff=0.6,
+  ):
     self.collection = "llama-org-rag"
 
     # create the Qdrant client
     client = QdrantClient("localhost", port=6333)
-    vector_store = QdrantVectorStore(client=client,
-                                     collection_name=self.collection)
+    vector_store = QdrantVectorStore(client=client, collection_name=self.collection)
 
     # load or create the index?
-    info = [c for c in client.get_collections().collections if c.name == self.collection]
+    info = [
+      c for c in client.get_collections().collections if c.name == self.collection
+    ]
     if 0 < len(info):
       log.info("Loading index from disk")
       self.index = VectorStoreIndex.from_vector_store(vector_store)
     else:
       log.info("Creating new index")
-      docs = SimpleDirectoryReader(input_dir=directory,
-                                   recursive=True,
-                                   required_exts=exts).load_data()
+      docs = SimpleDirectoryReader(
+        input_dir=directory, recursive=True, required_exts=exts
+      ).load_data()
       log.info(f"Read {len(docs)} {', '.join(exts)} docs from {directory}.")
       context = StorageContext.from_defaults(vector_store=vector_store)
-      self.index = VectorStoreIndex.from_documents(docs, show_progress=progress,
-                                                   storage_context=context)
+      self.index = VectorStoreIndex.from_documents(
+        docs, show_progress=progress, storage_context=context
+      )
 
     # post-processors filter the nodes returned from the similarity search
     # prior to creating the context for the LLM call
     self.post_processors = [
       SimilarityPostprocessor(similarity_cutoff=similarity_cutoff),
-      FixedRecencyPostprocessor(top_k=top_k, date_key='last_modified_date')
+      FixedRecencyPostprocessor(top_k=top_k, date_key="last_modified_date"),
     ]
 
     # query engine
@@ -68,7 +84,7 @@ class DocumentIndex:
       similarity_top_k=top_k,
       max_top_k=max_top_k,
       text_qa_template=qa_template,
-      node_postprocessors=self.post_processors
+      node_postprocessors=self.post_processors,
     )
 
     self.chat_engine = CondenseQuestionChatEngine.from_defaults(
@@ -88,47 +104,42 @@ class DocumentIndex:
     "Starts a chat repl."
     self.chat_engine.streaming_chat_repl()
 
+
 if __name__ == "__main__":
   # default values
-  interactive = False
-  listing = False
-  query = ''
-  directory = "/Users/christian/Documents/personal/notes/content/"
-
-  # argument parsing
-  arguments = sys.argv[1:]
-  short_opts = 'vilq:d:'
-  long_opts = ['verbose', 'interactive', 'list',
-               'query=', 'directory=']
+  parser = ArgumentParser(description="RAG over documents in a directory")
+  actions = parser.add_mutually_exclusive_group()
+  actions.add_argument(
+    "-l", "--list", help="list the files in the index", action="store_true"
+  )
+  actions.add_argument(
+    "-i", "--interactive", help="start an interactive chat", action="store_true"
+  )
+  actions.add_argument("-q", "--query", help="ask a single question")
+  parser.add_argument(
+    "-d",
+    "--directory",
+    help="set the directory to index",
+    default="/Users/christian/Documents/personal/notes/content/",
+  )
+  parser.add_argument(
+    "-v", "--verbose", help="produce more detailed output", default=0, action="count"
+  )
+  opts = parser.parse_args()
 
   try:
-    opts, _args = getopt.getopt(arguments, short_opts, long_opts)
-    for opt, arg in opts:
-      if opt in ('-v', '--verbose'):
-        log.setLevel(logging.DEBUG)
-      elif opt in ('-i', '--interactive'):
-        interactive = True
-      elif opt in ('-l', '--list'):
-        listing = True
-      elif opt in ('-q', '--query'):
-        query = arg
-      elif opt in ('-d', '--directory'):
-        directory = arg
-
     # RAG class
-    index = DocumentIndex(directory)
+    index = DocumentIndex(opts.directory)
 
-    # dispatch action
-    if listing:
+    if opts.verbose in range(4):
+      log.setLevel(log_levels[opts.verbose])
+
+    if opts.list:
       index.print_files()
-    elif interactive:
+    elif opts.interactive:
       agent.chat()
-    elif query:
-      index.query(query)
-
-  except getopt.GetoptError as err:
-    print(str(err))
-    sys.exit(2)
+    elif opts.query:
+      index.query(opts.query)
   except ResponseHandlingException as err:
     print("Unable to connect to qdrant. Is the qdrant container running?")
     sys.exit(4)
