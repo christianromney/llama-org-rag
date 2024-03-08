@@ -28,6 +28,8 @@ pip install -r requirements.txt
 I also use [[https://docs.astral.sh/ruff/][ruff]] for Python linting and formatting and [[https://github.com/evilmartians/lefthook][lefthook]] for Git hook
 management. The ~ruff.toml~ and ~lefthook.yml~ files in root directory contain their
 respective configurations.
+
+I use git-cliff to update the CHANGELOG.md.
 *** Conceptual Overview
 **** Retrieval Augmented Generation (RAG)
 Capitalized nouns in this section correspond to LlamaIndex classes
