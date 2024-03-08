@@ -1,6 +1,5 @@
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
 from llama_index.core import StorageContext, PromptTemplate
-from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.core.postprocessor import FixedRecencyPostprocessor
 from llama_index.core.chat_engine.condense_question import CondenseQuestionChatEngine
@@ -10,7 +9,8 @@ from llama_index.vector_stores.qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import ResponseHandlingException
 from argparse import ArgumentParser
-import os, sys, logging
+import sys
+import logging
 
 # global settings
 log_levels = {0: logging.ERROR, 1: logging.WARN, 2: logging.INFO, 3: logging.DEBUG}
@@ -137,9 +137,9 @@ if __name__ == "__main__":
     if opts.list:
       index.print_files()
     elif opts.interactive:
-      agent.chat()
+      index.chat()
     elif opts.query:
       index.query(opts.query)
-  except ResponseHandlingException as err:
+  except ResponseHandlingException:
     print("Unable to connect to qdrant. Is the qdrant container running?")
     sys.exit(4)
