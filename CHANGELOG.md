@@ -7,5 +7,6 @@ All notable changes to this project will be documented in this file.
 ### 📓 Documentation
 
 - *(changelog)* Created file to track changes
+- *(readme)* List optional development tools
 
 
