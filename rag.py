@@ -7,7 +7,6 @@ from llama_index.core.chat_engine.condense_question import CondenseQuestionChatE
 from llama_index.core.embeddings import resolve_embed_model
 from llama_index.llms.ollama import Ollama
 from llama_index.vector_stores.qdrant import QdrantVectorStore
-from llama_index.readers.file import UnstructuredReader
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import ResponseHandlingException
 import os, getopt, sys, logging
@@ -17,7 +16,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.WARN)
 log = logging.getLogger()
 
 Settings.embed_model = resolve_embed_model("local:BAAI/bge-small-en-v1.5")
-Settings.llm = Ollama(model="mixtral", request_timeout=60.0, temperature=0.5)
+Settings.llm = Ollama(model="mixtral", request_timeout=60.0, temperature=0.4)
 
 class DocumentIndex:
   def __init__(self, directory, exts=[".org"], progress=True,
