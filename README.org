@@ -3,11 +3,26 @@
 This project is a proof of concept for a tool to index my org-mode files to
 support semantic search using LlamaIndex.
 ** LlamaIndex
-*** Setup
-In a fresh virtual environment, install the basic dependencies for this project:
+*** Environment Setup
+This project uses the [[https://direnv.net/man/direnv-stdlib.1.html#codelayout-python3code][python3 layout]] from [[https://direnv.net/][direnv]]'s standard library. The ~.envrc~
+file is managed by [[https://www.agwa.name/projects/git-crypt/][git-crypt]] which handles encryption transparently. This file
+resembles the following example:
 
+#+begin_src shell :file .envrc
+export PROJECT_NAME=llama-org-rag
+export OPENAI_API_KEY=<some-key>
+export TOKENIZERS_PARALLELISM=true
+layout python3
+#+end_src
+
+With this file in place, running: ~direnv allow~ will enable direnv for this
+project and create a python virtual environment under the (ignored) ~.direnv~
+directory. Direnv will add the ~python~ and ~pip~ executables from the virtual
+environment to the path automatically.
+
+Now we can install this project's requirements with:
 #+begin_src shell
-pip3 install -r requirements.txt
+pip install -r requirements.txt
 #+end_src
 *** Conceptual Overview
 **** Retrieval Augmented Generation (RAG)
